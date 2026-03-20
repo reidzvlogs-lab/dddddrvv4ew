@@ -1,0 +1,59 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the school day app",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "classes": {
+          "type": "object",
+          "description": "Map of period ID to class name"
+        }
+      },
+      "required": ["uid", "displayName", "email", "classes"]
+    },
+    "HomeworkItem": {
+      "title": "HomeworkItem",
+      "description": "A homework task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "showOnMain": { "type": "boolean" },
+        "completed": { "type": "boolean" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "text", "dueDate", "showOnMain", "completed", "userId"]
+    },
+    "StickyNote": {
+      "title": "StickyNote",
+      "description": "A sticky note",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "color": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "text", "color", "userId"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles and their class schedules"
+    },
+    "users/{userId}/homework/{homeworkId}": {
+      "schema": { "$ref": "#/entities/HomeworkItem" },
+      "description": "User's homework items"
+    },
+    "users/{userId}/notes/{noteId}": {
+      "schema": { "$ref": "#/entities/StickyNote" },
+      "description": "User's sticky notes"
+    }
+  }
+}

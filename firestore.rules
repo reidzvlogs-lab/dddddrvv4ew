@@ -1,0 +1,120 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required, immutable)
+    //   - displayName: string (required, < 100 chars)
+    //   - classes: map (required, max 20 keys, values < 100 chars)
+    //   - theme: string (required, < 50 chars)
+    //
+    // Collection: users/{userId}/homework
+    // Document ID: {homeworkId}
+    // Fields:
+    //   - id: string (required, immutable)
+    //   - text: string (required, < 500 chars)
+    //   - dueDate: string (required, < 50 chars)
+    //   - showOnMain: bool (required)
+    //   - completed: bool (required)
+    //   - userId: string (required, immutable)
+    //
+    // Collection: users/{userId}/notes
+    // Document ID: {noteId}
+    // Fields:
+    //   - id: string (required, immutable)
+    //   - text: string (required, < 2000 chars)
+    //   - color: string (required, < 50 chars)
+    //   - userId: string (required, immutable)
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return true; // Auth removed per user request
+    }
+    
+    function uidUnchanged(userId) {
+      return !('uid' in request.resource.data) || request.resource.data.uid == userId;
+    }
+    
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    function idNotModified() {
+      return !('id' in request.resource.data) || request.resource.data.id == resource.data.id;
+    }
+    
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidClassesMap(classesMap) {
+      return classesMap is map && classesMap.size() <= 20; // Basic size check, deeper validation is complex in rules without knowing keys
+    }
+    
+    function isValidUser() {
+      return hasOnlyAllowedFields(['uid', 'displayName', 'classes', 'theme', 'isOnline', 'timeSpent']) &&
+             request.resource.data.uid is string &&
+             request.resource.data.displayName is string && request.resource.data.displayName.size() < 100 &&
+             request.resource.data.theme is string && request.resource.data.theme.size() < 50 &&
+             (!('isOnline' in request.resource.data) || request.resource.data.isOnline is bool) &&
+             (!('timeSpent' in request.resource.data) || request.resource.data.timeSpent is number) &&
+             isValidClassesMap(request.resource.data.classes);
+    }
+    
+    function isValidHomework(userId) {
+      return hasOnlyAllowedFields(['id', 'text', 'dueDate', 'showOnMain', 'completed', 'userId']) &&
+             request.resource.data.id is string && request.resource.data.id.size() < 100 &&
+             request.resource.data.text is string && request.resource.data.text.size() < 500 &&
+             request.resource.data.dueDate is string && request.resource.data.dueDate.size() < 50 &&
+             request.resource.data.showOnMain is bool &&
+             request.resource.data.completed is bool &&
+             request.resource.data.userId is string && request.resource.data.userId == userId;
+    }
+    
+    function isValidNote(userId) {
+      return hasOnlyAllowedFields(['id', 'text', 'color', 'userId', 'showOnMain']) &&
+             request.resource.data.id is string && request.resource.data.id.size() < 100 &&
+             request.resource.data.text is string && request.resource.data.text.size() < 2000 &&
+             request.resource.data.color is string && request.resource.data.color.size() < 50 &&
+             request.resource.data.userId is string && request.resource.data.userId == userId &&
+             (!('showOnMain' in request.resource.data) || request.resource.data.showOnMain is bool);
+    }
+
+    match /settings/{document} {
+      allow read, write: if true;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser() && uidUnchanged(userId);
+      allow update: if isOwner(userId) && isValidUser() && uidNotModified();
+      allow delete: if isOwner(userId);
+      
+      match /homework/{homeworkId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidHomework(userId);
+        allow update: if isOwner(userId) && isValidHomework(userId) && idNotModified();
+        allow delete: if isOwner(userId);
+      }
+      
+      match /notes/{noteId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidNote(userId);
+        allow update: if isOwner(userId) && isValidNote(userId) && idNotModified();
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
